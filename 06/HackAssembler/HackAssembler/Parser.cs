@@ -15,17 +15,15 @@ namespace HackAssembler
         public string WriteFilename = "TestFileWrite.txt";
         public string NewFilename;
         public string instruction;
-        public string A_Command;
-        public string C_Command;
-        public string L_Command;
-        public int lineNumber;
+        public int lineNumber = -1;
         public int Symbol_Value = 16;
         public int iterations = 0;
         public string labelToSave;
-        
+        public string ACompBit;
+        public string ACompBits;
+        public string BinaryCode;
 
-
-        public string Filepath = "C:/Users/mathi/OneDrive/Skrivebord/";
+        public string Filepath = "C:/Users/mathi/OneDrive/Skrivebord/nand2tetris/projects/06/pong/";
 
         public Parser(string FileName)
         {
@@ -39,26 +37,37 @@ namespace HackAssembler
             StreamReader sr = new StreamReader(Filepath + Filename);
             StreamWriter sw = new StreamWriter(Filepath + WriteFilename);
 
-            line = sr.ReadLine();
 
             while (!sr.EndOfStream)
             {
-                lineNumber++;
                 line = sr.ReadLine();
                 HandleLine(line, sw);
+                lineNumber++;
                 
             }
             sw.Close();
             sr.Close();
 
-            //iterations = 1;
-
-
         }
 
-        private void HandleLabel()
+        public void LabelReader()
         {
+            FileInfo file = new FileInfo(Filename);
+            StreamReader sr = new StreamReader(Filepath + Filename);
+            StreamWriter sw = new StreamWriter(Filepath + WriteFilename);
 
+            //line = sr.ReadLine();
+
+            while (!sr.EndOfStream)
+            {
+                line = sr.ReadLine();
+                checkLabel(line);
+                lineNumber++;
+
+            }
+            sw.Close();
+            sr.Close();
+            lineNumber = 0;
         }
 
         private void HandleLine(string line, StreamWriter sw)
@@ -71,7 +80,7 @@ namespace HackAssembler
             {
                 return;
             }
-            checkLabel(line);
+            //checkLabel(line);
 
             string A_value = checkIfA_Command(line);
             if (A_value != null)
@@ -84,21 +93,38 @@ namespace HackAssembler
             }
         }
 
+        public void AddtoSymbolTable(string value)
+        {
+            bool isNumber = int.TryParse(value, out int numericValue);
+
+            bool isSymbol = SymbolTable.symbols.TryGetValue(value, out numericValue);
+
+            if (!isSymbol)
+            {
+                numericValue = Symbol_Value;
+                SymbolTable.symbols.Add(value, numericValue);
+                Symbol_Value++;
+            }
+        }
+
         private void HandleAInstruction(string value, StreamWriter sw)
         {
 
-            // get numbers/chars of A-instruction after @ symbol
+            //AddtoSymbolTable(value);
+
+            //get numbers/ chars of A-instruction after @ symbol
             bool isNumber = int.TryParse(value, out int numericValue);
 
             if (!isNumber)
             {
                 bool isSymbol = SymbolTable.symbols.TryGetValue(value, out numericValue);
                 // if symbol dont exist add to table
-
-                if (!isSymbol)
+                string checkLabel = Regex.Replace(line, @"[^a-zA-Z]", "");
+                bool islabel = SymbolTable.labelTable.ContainsKey(checkLabel);
+                if (!isSymbol && !islabel)
                 {
                     numericValue = Symbol_Value;
-                    SymbolTable.symbols.Add( value, numericValue);
+                    SymbolTable.symbols.Add(value, numericValue);
                     Symbol_Value++;
                 }
             }
@@ -115,6 +141,22 @@ namespace HackAssembler
                 else
                 {
                     binaryCode += "0";
+                }
+            }
+
+            value = value.Replace("_", "");
+            bool test = SymbolTable.labelTable.ContainsKey(value);
+            SymbolTable.labelTable.TryGetValue(value, out int labelNr);
+            if (SymbolTable.labelTable.ContainsKey(value))
+            {
+                binaryCode = Convert.ToString(labelNr, 2);
+            }
+            if (binaryCode.Length < 16)
+            {
+                //int Length = binaryCode.Length;
+                for (int i = binaryCode.Length; i < 16; i++)
+                {
+                    binaryCode = "0" + binaryCode;
                 }
             }
             sw.WriteLine(binaryCode);
@@ -136,21 +178,70 @@ namespace HackAssembler
             string[] destBits = { "0", "0", "0" };
             string compchars = "";
             string compBits = "";
-
-
+            
 
             if (line.Contains("="))
-            {            
-                //Regex splitEquals = new Regex(@"^([^=]+)([^=].*)");
-                Regex splitEquals = new Regex(@"^([^=-]+)");
+            {
+
+
+     
+                    Regex splitEquals = new Regex(@"^([^=]+)=([^=].*)");
+                    //Regex splitEquals = new Regex(@"^([^=]+)");
+                    var match = splitEquals.Match(line);
+                    
+                    if (match.Success)
+                    {
+                        destination1 = match.Groups[1].Value;
+                        compchars = match.Groups[2].Value;
+                        compchars = compchars.Replace("= ", "");
+                        compchars = compchars.Replace(" ", "");
+                        compchars = compchars.Replace("/", "");
+                        compchars = compchars.Replace("\t", "");
+
+                        jump = match.Groups[3].Value;
+                    }
+                    else
+                    {
+                        destination1 = null;
+                        jump = null;
+                    }
+
+                    if (destination1 != null && jump != null )
+                    {
+                        if (destination1.Contains("A"))
+                        {
+                            destBits[0] = "1";
+                        }
+                        if (destination1.Contains("D"))
+                        {
+                            destBits[1] = "1";
+                        }
+                        if (destination1.Contains("M"))
+                        {
+                            destBits[2] = "1";
+                        }
+                    }
+
+                //compchars = line.ToString();
+                compBits = SymbolTable.compTable[compchars];
+            }
+            else if(line.Contains(";"))
+            {
+                line = line.Replace(" ", "");
+                Regex splitEquals = new Regex(@"^([^;]+);([^;]+)");
+                //Regex splitEquals = new Regex(@"^([^;]+)");
                 var match = splitEquals.Match(line);
-                
+
                 if (match.Success)
                 {
                     destination1 = match.Groups[1].Value;
-                    compchars = match.Groups[2].Value;
-                    compchars = compchars.Replace("= ", "");
-                    jump = match.Groups[3].Value;
+                    //compchars = match.Groups[2].Value;
+
+                    jump = match.Groups[2].Value;
+                    jump = jump.Replace("= ", "");
+                    jump = jump.Replace(" ", "");
+                    jump = jump.Replace("/", "");
+                    jump = jump.Replace("\t", "");
                 }
                 else
                 {
@@ -158,61 +249,35 @@ namespace HackAssembler
                     jump = null;
                 }
 
-                if (destination1 != null && jump != null )
-                {
-                    if (destination1.Contains("A"))
-                    {
-                        destBits[0] = "1";
-                    }
-                    if (destination1.Contains("D"))
-                    {
-                        destBits[1] = "1";
-                    }
-                    if (destination1.Contains("M"))
-                    {
-                        destBits[2] = "1";
-                    }
-                }
+
+                jmpBits = SymbolTable.JmpTable[jump];
+                compBits = SymbolTable.compTable[destination1];
             }
             else
             {
-                compchars = line.ToString();
+                if (line.Contains("-"))
+                {
+                        
+                    compchars = line;
+                    compchars = compchars.Replace(" ", "");
+
+                    compBits = SymbolTable.compTable[compchars];
+
+                }
+
+            }
+            
+            if (!line.Contains("(") && !line.Contains(")"))
+            {
+
+                 string tempDestBits = String.Join("", destBits);
+                 BinaryCode = opcode + compBits + tempDestBits + jmpBits;
+                 sw.WriteLine(BinaryCode);
             }
 
-            compBits = SymbolTable.compTable[compchars];
 
         }
 
-        private (string dest1, string dest2) SplitCInstruction(string line, string splitter)
-        {
-            Regex splitEquals = new Regex(@"^([^=]+)(" + splitter + ")(.*)$");
-            var match = splitEquals.Match(line);
-            if (!match.Success)
-            {
-                return (dest1: null, dest2: null);
-            }
-            return (dest1: match.Groups[1].Value, dest2: match.Groups[3].Value);
-        }
-
-        private string StripCommentsWS(string line)
-        {
-            Regex trailingComment = new Regex(@"^(//)(.*)$");
-            var matchTrailComment = trailingComment.Match(line);
-            if (matchTrailComment.Success)
-            {
-                line = matchTrailComment.Groups[2].Value;
-            }
-
-            Regex LeadingWSComment = new Regex(@"^([^/\s]+)(.*)$");
-            var matchLeadWSComment = LeadingWSComment.Match(line);
-            // remove leading WS/comment, if exist
-            if (matchLeadWSComment.Success)
-            {
-                line = matchLeadWSComment.Groups[1].Value;
-            }
-            return line;
-
-        }
 
         private string checkIfA_Command(string line)
         {
@@ -230,7 +295,16 @@ namespace HackAssembler
         private bool checkLabel(string line)
         {
             // regex for assembly labels e.g. (LOOP)
+            int index1 = line.LastIndexOf("/");
+            if (index1 > 0)
+                line = line.Substring(0, index1); // or index + 1 to keep slash
+
+
             Regex label = new Regex(@"^\(.+\)");
+            if (line == "" || line == "/")
+            {
+                lineNumber = lineNumber - 1;
+            }
 
             if (label.IsMatch(line))
             {
@@ -240,7 +314,14 @@ namespace HackAssembler
 
                 labelToSave = line;
                 labelToSave = Regex.Replace(line, @"[^a-zA-Z]", "");
-                SymbolTable.labelTable.Add(labelToSave, lineNumber + 1);
+
+                if (!SymbolTable.labelTable.ContainsKey(labelToSave))
+                {
+                    int labelLineNr = lineNumber;
+                    SymbolTable.labelTable.Add(labelToSave, labelLineNr);
+                }
+
+                lineNumber = lineNumber - 1;
                 return true;
             }
             return false;

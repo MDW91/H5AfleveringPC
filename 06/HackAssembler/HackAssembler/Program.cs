@@ -11,12 +11,12 @@ namespace HackAssembler
         static void Main(string[] args)
         {
 
-            string filePath = System.IO.Path.GetFullPath("TestFile.txt");
+            string filePath = System.IO.Path.GetFullPath("Pong.asm");
             //indlæs tekstfil 
-            Parser parser = new Parser("TestFile.txt");
-
+            Parser parser = new Parser("Pong.asm");
+            parser.LabelReader();
             parser.FileReader();
-            Console.ReadKey();
+            //Console.ReadKey();
 
         }
     }
